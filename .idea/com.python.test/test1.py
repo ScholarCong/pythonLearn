@@ -32,7 +32,7 @@ def main():
         #插叙所有行
         result = cursor1.fetchall()
         for row in result:
-            print(row['id'] ,row['name'] , row['gen'] , row['email'])
+            print(row['id'] ,row['name'] , row['gen'] , row['email'])  #默认的分割是空格
         # print(f'{row[0]} {row[1]} {row[2]} {row[3]}')
         #查询5行
         #cursor1.fetchmany(5)
