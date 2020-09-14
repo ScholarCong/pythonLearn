@@ -243,10 +243,10 @@ record_sql = '''
     select form_name,wt_id,record_data,isyscore_form_record.create_time from isyscore_form_record
     left join isyscore_form_info on isyscore_form_record.form_id = isyscore_form_info.id
     where isyscore_form_info.del_flag = '0' and form_name not like '%%test%%'
-    and (isyscore_form_record.wt_id is not null or form_name ='生产日历') and isyscore_form_record.create_time > '%s'
+    and (isyscore_form_record.wt_id is not null or form_name ='生产日历') and isyscore_form_record.create_time > ''
     and form_name = '折旧表' 
     order by create_time asc;
-    '''  % (options['isyscore_form_record'])
+    '''  #% (options['isyscore_form_record'])
 
 record_df = pd.read_sql(record_sql, conn)
 record_df.columns = ['form_name', 'wt_id', 'record_data', 'create_time']
@@ -282,6 +282,14 @@ for index, row in record_df.iterrows():
     except pymysql.err.IntegrityError:
         pass
     max_time = row['create_time']
+
+    #    *    *    *     *     *    *      *
+    #    秒   分    时    日    月   星期    年
+    #    13   13   15    20    *    ?      (可选，留空)                    通用的标识符  , - * /
+    #    cron表达式 ： 6或7个域
+    #    *   /10    *     *    *    *
+
+    #    airflow cron 表达式: * * * * * * (分 时 月 年 周 秒)
 
 
 # if(max_time is not None):
