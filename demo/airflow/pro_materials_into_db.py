@@ -66,7 +66,7 @@ with conn.cursor() as cursor:
         cost = costObj['cost']
         insertCost = '''
                 update dw_production_cost set cost = %s
-                where product_id = %s
+                where product_id = %s and dimension = 0
             '''
         cursor.execute(insertCost, [cost, productId])
 

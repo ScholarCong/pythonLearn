@@ -75,7 +75,7 @@ with conn.cursor() as cursor:
         '''
         cursor.execute(selectWtType,wtId)
         wtType = cursor.fetchone()  # 1:生产型  2：辅助型
-
+        wtTypeCode = wtType['wt_type']
         insertSql = '''
             insert  cloudteam_data_warehouse.st_production_daily_record
             values
@@ -87,6 +87,6 @@ with conn.cursor() as cursor:
         now = datetime.now()
         nowDate = now.strftime("%Y-%m-%d")
 
-        cursor.execute(insertSql,[ nowDate,row['wt_id'],row['wt_name'],wtType,record_data[0],productName,record_data[3]
+        cursor.execute(insertSql,[nowDate,row['wt_id'],row['wt_name'],wtTypeCode,record_data[0],productName,record_data[3]
                                    ,record_data[4],record_data[5],record_data[6],isLast])
         conn.commit()
