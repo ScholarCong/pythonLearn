@@ -1,26 +1,53 @@
 # coding:utf-8
 import pymysql
-import pandas as pd
+import time
 import json
-from datetime import datetime
+import configparser
 
 conn = pymysql.connect(host='10.20.5.3', user='root', password='Isysc0re', port=63306, db='cloudteam'
                        ,cursorclass=pymysql.cursors.DictCursor)
 
+
+# cf = configparser.ConfigParser()
+# cf.read("/home/airflow/airflow/dags/cloudteam_dev/start_time.cnf")
+# cf.read("/home/airflow/airflow/dags/cloudteam_dev/end_time.cnf")
+# options_start = cf['start_time']
+# options_end = cf['end_time']
+
+start_time = '2020-09-01'
+end_time = '2020-10-01'
+
 with conn.cursor() as cursor:
 
-    record_sql = '''
-        select record.wt_id,wt.wt_name,record.record_data
-		from isyscore_form_record record
-        left join isyscore_form_info info
-		on record.form_id = info.id
-		left join isyscore_work_team_info wt 
-		on wt.id = record.wt_id
-        where record.del_flag = '0' and info.del_flag = '0' and wt.del_flag = '0'
-        and info.form_name = '生产日报' 
-        and date_format(record.create_time,'%Y-%m-%d') = date_format(now(),'%Y-%m-%d');  #'%Y-%m-%d %H:%i:%s'
-    '''
+    # if (options_start['start_time'] == 'None' and options_end['end_time'] == 'None'):
+    if (start_time == None and end_time == None):
+        record_sql = '''
+            select record.wt_id,wt.wt_name,record.record_data
+            from isyscore_form_record record
+            left join isyscore_form_info info
+            on record.form_id = info.id
+            left join isyscore_work_team_info wt 
+            on wt.id = record.wt_id
+            where record.del_flag = '0' and info.del_flag = '0' and wt.del_flag = '0'
+            and info.form_name = '生产日报' 
+            and date_format(record.create_time,'%Y-%m-%d') = date_format(now(),'%Y-%m-%d');  #'%Y-%m-%d %H:%i:%s'
+        '''
+    else:
+        record_sql = '''
+                   select record.wt_id,wt.wt_name,record.record_data
+                   from isyscore_form_record record
+                   left join isyscore_form_info info
+                   on record.form_id = info.id
+                   left join isyscore_work_team_info wt 
+                   on wt.id = record.wt_id
+                   where record.del_flag = '0' and info.del_flag = '0' and wt.del_flag = '0'
+                   and info.form_name = '生产日报' 
+                   and record.create_time >= '%s'
+                   and record.create_time <= '%s'; 
+               ''' %(start_time,end_time)
+
     cursor.execute(record_sql)
+
     for row in cursor.fetchall():
         #获取行的json
         json_data = json.loads(row['record_data'])
@@ -84,9 +111,10 @@ with conn.cursor() as cursor:
             )
         '''
         # 查询当前班组是否为产品落地的班组   1：是产品落地的班组
-        now = datetime.now()
-        nowDate = now.strftime("%Y-%m-%d")
+        dailyTime = int(record_data[1])
+        timeArray = time.localtime(dailyTime/1000)
+        ymd = time.strftime("%Y-%m-%d", timeArray)
 
-        cursor.execute(insertSql,[nowDate,row['wt_id'],row['wt_name'],wtTypeCode,record_data[0],productName,record_data[3]
+        cursor.execute(insertSql,[ymd,row['wt_id'],row['wt_name'],wtTypeCode,record_data[0],productName,record_data[3]
                                    ,record_data[4],record_data[5],record_data[6],isLast])
         conn.commit()

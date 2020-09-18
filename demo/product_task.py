@@ -8,10 +8,10 @@ from datetime import datetime
 from functools import reduce
 import os
 import configparser
-# cf = configparser.ConfigParser()
-# cf.read("/home/airflow/airflow/dags/cloudteam_pre/update_time.cnf")
-# os.environ['NLS_LANG'] = 'SIMPLIFIED CHINESE_CHINA.UTF8'
-# options = cf['tables']
+cf = configparser.ConfigParser()
+cf.read("/home/airflow/airflow/dags/cloudteam_pre/update_time.cnf")
+os.environ['NLS_LANG'] = 'SIMPLIFIED CHINESE_CHINA.UTF8'
+options = cf['tables']
 
 table_of_form = {
     "生产日报": "ST_PRODUCTION_TASK",
