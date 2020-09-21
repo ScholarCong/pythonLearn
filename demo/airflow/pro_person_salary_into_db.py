@@ -41,6 +41,14 @@ with conn.cursor() as cursor:
                 group by record.product_id 
             '''
     else:
+        # 删除当前天的计算数据
+        deleteSql = '''
+                         delete from cloudteam_data_warehouse.dw_production_cost
+                         where ymd >= %s and ymd <= %s 
+                         and dimension = 1
+                     '''
+        # cursor.execute(deleteSql, [options_start['start_time'], options_end['end_time']])
+        cursor.execute(deleteSql, [start_time, end_time])
         insertSql = '''
                        insert into cloudteam_data_warehouse.dw_production_cost 
                        (ymd,product_name,product_id,dimension,sum)
@@ -85,7 +93,7 @@ with conn.cursor() as cursor:
         now = datetime.now()
         ymd = now.strftime("%Y-%m-%d")
 
-        if (start_time == None and start_time == None):
+        if (start_time != None and end_time != None):
             ymd = row['ymd']
 
         # 查询考勤表请假的人员
@@ -96,10 +104,9 @@ with conn.cursor() as cursor:
                 on record.form_id = info.id
                 where record.del_flag = '0' and info.del_flag = '0'
                 and info.form_name = '员工考勤表' 
-                and date_format(record.create_time,'%Y-%m-%d') =  
-				date_format(now(),'%Y-%m-%d');  #'%Y-%m-%d %H:%i:%s'
-        '''
-        cursor.execute(selectRecord)
+                and date_format(record.create_time,'%s-%s-%s') = '%s'          
+        '''  %('Y','m','d',ymd)
+        cursor.execute(selectRecord)  #'%Y-%m-%d'
         # 请假人的id列表
         array = []
         for row1 in cursor.fetchall():
@@ -132,6 +139,7 @@ with conn.cursor() as cursor:
                 perArray.append(row2['id'])
 
         personsTotalSalary = 0
+        sums = 0
         # 遍历所有生产人员，计算单个人的计件薪资
         for index in range(len(perArray)):
             #记件工资 = 员工A生产产品A的工资  +  员工A生产产品A的岗位工资
@@ -271,14 +279,16 @@ with conn.cursor() as cursor:
 
         totalManagePersonMoney = decimal.Decimal(totalManagePersonMoney)
         personsTotalSalary = personsTotalSalary+totalManagePersonMoney
-        perProductionSalary = personsTotalSalary/sums
-        # 每个人的生产人工费入库
-        insertCost = '''
-            update cloudteam_data_warehouse.dw_production_cost 
-            set cost = %s  
-            where product_id = %s and dimension = 1
-        '''
-        cursor.execute(insertCost,[perProductionSalary,productId])
+        if(sums != 0):
+            perProductionSalary = personsTotalSalary/sums
+            # 每个人的生产人工费入库
+            insertCost = '''
+                update cloudteam_data_warehouse.dw_production_cost 
+                set cost = %s  
+                where product_id = %s and dimension = 1
+                and ymd = %s
+            '''
+            cursor.execute(insertCost,[perProductionSalary,productId,ymd])
         conn.commit()
 
 

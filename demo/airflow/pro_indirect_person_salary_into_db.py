@@ -7,39 +7,92 @@ import decimal
 conn = pymysql.connect(host='10.20.5.3', user='root', password='Isysc0re', port=63306,
                        db='cloudteam', cursorclass=pymysql.cursors.DictCursor)  # 使用字典游标查询)
 
+# cf = configparser.ConfigParser()
+# cf.read("/home/airflow/airflow/dags/cloudteam_dev/start_time.cnf")
+# cf.read("/home/airflow/airflow/dags/cloudteam_dev/end_time.cnf")
+# options_start = cf['start_time']
+# options_end = cf['end_time']
+
+start_time = '2020-09-01'
+end_time = '2020-10-01'
+
 with conn.cursor() as cursor:
-    insertSql = '''
-            insert into cloudteam_data_warehouse.dw_production_cost 
-            (ymd,product_name,product_id,dimension,sum)
-            select 
-                record.ymd,
-                record.product_name,
-                record.product_id,
-                2,
-                (
-                     select distinct actural_pass_num 
-                     from cloudteam_data_warehouse.st_production_daily_record 
-                     where product_id = record.product_id
-                     and is_last = 1 and ymd = date_format(now(),'%Y-%m-%d')
-				) sum 
-            from cloudteam_data_warehouse.st_production_daily_record record
-            where record.ymd = date_format(now(),'%Y-%m-%d')
-            and record.wt_type = '1'
-            group by record.product_id 
-        '''
+
+    # if (options_start['start_time'] == None and options_end['end_time'] == None):
+    if (start_time == None and start_time == None):
+        insertSql = '''
+                insert into cloudteam_data_warehouse.dw_production_cost 
+                (ymd,product_name,product_id,dimension,sum)
+                select 
+                    record.ymd,
+                    record.product_name,
+                    record.product_id,
+                    2,
+                    (
+                         select distinct actural_pass_num 
+                         from cloudteam_data_warehouse.st_production_daily_record 
+                         where product_id = record.product_id
+                         and is_last = 1 and ymd = date_format(now(),'%Y-%m-%d')
+                    ) sum 
+                from cloudteam_data_warehouse.st_production_daily_record record
+                where record.ymd = date_format(now(),'%Y-%m-%d')
+                and record.wt_type = '1'
+                group by record.product_id 
+            '''
+    else:
+        # 删除当前天的计算数据
+        deleteSql = '''
+                              delete from cloudteam_data_warehouse.dw_production_cost
+                              where ymd >= %s and ymd <= %s 
+                              and dimension = 2
+                          '''
+        # cursor.execute(deleteSql, [options_start['start_time'], options_end['end_time']])
+        cursor.execute(deleteSql, [start_time, end_time])
+        insertSql = '''
+                       insert into cloudteam_data_warehouse.dw_production_cost 
+                       (ymd,product_name,product_id,dimension,sum)
+                       select 
+                           record.ymd,
+                           record.product_name,
+                           record.product_id,
+                           2,
+                           (
+                                select distinct actural_pass_num 
+                                from cloudteam_data_warehouse.st_production_daily_record 
+                                where product_id = record.product_id
+                                and is_last = 1 and ymd = record.ymd
+                           ) sum 
+                       from cloudteam_data_warehouse.st_production_daily_record record
+                       where record.ymd >= '%s'
+                       and record.ymd <= '%s'
+                       and record.wt_type = '1'
+                       group by record.ymd,record.product_id 
+                   ''' %(start_time,end_time)
+
+
     cursor.execute(insertSql)
 
     # dimension = 2 : 间接人工费
-    selectPro = '''
-               select product_id,sum from cloudteam_data_warehouse.dw_production_cost 
-               where ymd = date_format(now(),'%Y-%m-%d') and dimension = 1
-           '''
+    # if (options_start['start_time'] == None and options_end['end_time'] == None):
+    if (start_time == None and start_time == None):
+        selectPro = '''
+                   select product_id,sum,ymd from cloudteam_data_warehouse.dw_production_cost 
+                   where ymd = date_format(now(),'%Y-%m-%d') and dimension = 2
+               '''
+    else:
+        selectPro = '''
+                          select product_id,sum,ymd from cloudteam_data_warehouse.dw_production_cost 
+                          where ymd >= '%s' and ymd <= '%s'
+                          and dimension = 2
+                      '''   %(start_time,end_time)
+
     cursor.execute(selectPro)
     for row in cursor.fetchall():
         productId = row['product_id']
         now = datetime.now()
         nowDate = now.strftime("%Y-%m-%d")
 
+        ymd = row['ymd']
         # 查询考勤表请假的人员
         selectRecord = '''
                         select record.record_data
@@ -48,9 +101,8 @@ with conn.cursor() as cursor:
                         on record.form_id = info.id
                         where record.del_flag = '0' and info.del_flag = '0'
                         and info.form_name = '员工考勤表' 
-                        and date_format(record.create_time,'%Y-%m-%d') =  
-                        date_format(now(),'%Y-%m-%d');                      #'%Y-%m-%d %H:%i:%s'
-                '''
+                        and date_format(record.create_time,'%s-%s-%s') =  '%s'                
+                ''' %('Y','m','d',ymd)
         cursor.execute(selectRecord)
         # 请假人的id列表
         array = []
@@ -170,13 +222,13 @@ with conn.cursor() as cursor:
                          select distinct actural_pass_num 
                          from cloudteam_data_warehouse.st_production_daily_record 
                          where product_id = record.product_id
-                         and is_last = 1 and ymd = date_format(now(),'%Y-%m-%d')
+                         and is_last = 1 and ymd = record.ymd
                     ) sum 
                 from cloudteam_data_warehouse.st_production_daily_record record
-                where record.ymd = date_format(now(),'%Y-%m-%d')
+                where record.ymd = '%s'
                 and record.wt_type = '1'
                 group by record.product_id 
-        '''
+        ''' %(ymd)
         cursor.execute(selectPros)
         sumTime = 0
         currenctProInfo = []
@@ -206,8 +258,9 @@ with conn.cursor() as cursor:
                    update cloudteam_data_warehouse.dw_production_cost 
                    set cost = %s  
                    where product_id = %s and dimension = 2
+                   and ymd = %s
                '''
-        cursor.execute(insertCost, [finalPerProSalary, productId])
+        cursor.execute(insertCost, [finalPerProSalary, productId,ymd])
         conn.commit()
 
 
