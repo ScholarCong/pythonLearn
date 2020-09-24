@@ -8,18 +8,21 @@ conn = pymysql.connect(host='10.20.5.3', user='root', password='Isysc0re', port=
                        ,cursorclass=pymysql.cursors.DictCursor)
 
 
-# cf = configparser.ConfigParser()
-# cf.read("/home/airflow/airflow/dags/cloudteam_dev/start_time.cnf")
-# cf.read("/home/airflow/airflow/dags/cloudteam_dev/end_time.cnf")
-# options_start = cf['start_time']
-# options_end = cf['end_time']
+cf = configparser.ConfigParser()
+cf.read("/home/airflow/airflow/dags/cloudteam_dev/start_time.cnf")
+cf.read("/home/airflow/airflow/dags/cloudteam_dev/end_time.cnf")
+options_start = cf['start_time']
+options_end = cf['end_time']
 
-start_time = '2020-09-01'
-end_time = '2020-10-01'
+start_time = options_start['start_time']
+end_time = options_end['end_time']
+
+# start_time = '2020-09-01'
+# end_time = '2020-10-01'
 
 with conn.cursor() as cursor:
 
-    # if (options_start['start_time'] == 'None' and options_end['end_time'] == 'None'):
+    #if (options_start['start_time'] == None and options_end['end_time'] == None):
     if (start_time == None and end_time == None):
         record_sql = '''
             select record.wt_id,wt.wt_name,record.record_data
@@ -33,6 +36,12 @@ with conn.cursor() as cursor:
             and date_format(record.create_time,'%Y-%m-%d') = date_format(now(),'%Y-%m-%d');  #'%Y-%m-%d %H:%i:%s'
         '''
     else:
+        deleteRecord = '''
+              delete from cloudteam_data_warehouse.st_production_daily_record
+                         where ymd >= %s and ymd <= %s
+        ''' %(start_time,end_time)
+        cursor.execute(deleteRecord)
+
         record_sql = '''
                    select record.wt_id,wt.wt_name,record.record_data
                    from isyscore_form_record record

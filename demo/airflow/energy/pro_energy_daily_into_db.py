@@ -1,30 +1,30 @@
 # coding:utf-8
 import pymysql
 import json
-from datetime import datetime
-import decimal
+import configparser
 import time
 
 conn = pymysql.connect(host='10.20.5.3', user='root', password='Isysc0re', port=63306,
                        db='cloudteam', cursorclass=pymysql.cursors.DictCursor)  # 使用字典游标查询)
 
 
-# cf = configparser.ConfigParser()
-# cf.read("/home/airflow/airflow/dags/cloudteam_dev/start_time.cnf")
-# cf.read("/home/airflow/airflow/dags/cloudteam_dev/end_time.cnf")
-# options_start = cf['start_time']
-# options_end = cf['end_time']
+cf = configparser.ConfigParser()
+cf.read("/home/airflow/airflow/dags/cloudteam_dev/start_time.cnf")
+cf.read("/home/airflow/airflow/dags/cloudteam_dev/end_time.cnf")
+options_start = cf['start_time']
+options_end = cf['end_time']
 
-start_time = '2020-09-01'
-end_time = '2020-10-01'
+start_time = options_start['start_time']
+end_time = options_end['end_time']
+
+# start_time = '2020-09-01'
+# end_time = '2020-10-01'
 
 start = int(time.mktime(time.strptime(start_time, "%Y-%m-%d")))*1000
 end = int(time.mktime(time.strptime(end_time, "%Y-%m-%d")))*1000
 
 with conn.cursor() as cursor:
 
-    # if (options_start['start_time'] == None and options_end['end_time'] == None):
-    # if (start_time == None and start_time == None):
     selectEnergyInfo = '''
           select record.record_data
                           from isyscore_form_record record

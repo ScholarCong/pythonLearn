@@ -1,25 +1,27 @@
 # coding:utf-8
 import pymysql
-import json
+import configparser
 from datetime import datetime
-import decimal
+
 
 conn = pymysql.connect(host='10.20.5.3', user='root', password='Isysc0re', port=63306,
                        db='cloudteam', cursorclass=pymysql.cursors.DictCursor)  # 使用字典游标查询)
 
 
-# cf = configparser.ConfigParser()
-# cf.read("/home/airflow/airflow/dags/cloudteam_dev/start_time.cnf")
-# cf.read("/home/airflow/airflow/dags/cloudteam_dev/end_time.cnf")
-# options_start = cf['start_time']
-# options_end = cf['end_time']
+cf = configparser.ConfigParser()
+cf.read("/home/airflow/airflow/dags/cloudteam_dev/start_time.cnf")
+cf.read("/home/airflow/airflow/dags/cloudteam_dev/end_time.cnf")
+options_start = cf['start_time']
+options_end = cf['end_time']
 
-start_time = '2020-09-01'
-end_time = '2020-10-01'
+start_time = options_start['start_time']
+end_time = options_end['end_time']
+
+# start_time = '2020-09-01'
+# end_time = '2020-10-01'
 
 with conn.cursor() as cursor:
 
-    # if (options_start['start_time'] == None and options_end['end_time'] == None):
     if (start_time == None and start_time == None):
         insertSql = '''
                 insert into cloudteam_data_warehouse.dw_production_cost 
@@ -28,7 +30,7 @@ with conn.cursor() as cursor:
                     record.ymd,
                     record.product_name,
                     record.product_id,
-                    4,
+                    '设备折旧费',
                     (
                          select distinct actural_pass_num 
                          from cloudteam_data_warehouse.st_production_daily_record 
@@ -45,7 +47,7 @@ with conn.cursor() as cursor:
         deleteSql = '''
                          delete from cloudteam_data_warehouse.dw_production_cost
                          where ymd >= %s and ymd <= %s 
-                         and dimension = 4
+                         and dimension = '设备折旧费'
                      '''
         # cursor.execute(deleteSql, [options_start['start_time'], options_end['end_time']])
         cursor.execute(deleteSql, [start_time, end_time])
@@ -56,7 +58,7 @@ with conn.cursor() as cursor:
                            record.ymd,
                            record.product_name,
                            record.product_id,
-                           4,
+                           '设备折旧费',
                            (
                                 select distinct actural_pass_num 
                                 from cloudteam_data_warehouse.st_production_daily_record 
@@ -77,14 +79,14 @@ with conn.cursor() as cursor:
     if (start_time == None and start_time == None):
         selectPro = '''
                    select product_id,sum from cloudteam_data_warehouse.dw_production_cost 
-                   where ymd = date_format(now(),'%Y-%m-%d') and dimension = 4
+                   where ymd = date_format(now(),'%Y-%m-%d') and dimension = '设备折旧费'
                '''
     else:
         selectPro = '''
                           select product_id,sum,ymd from cloudteam_data_warehouse.dw_production_cost 
                           where ymd >= '%s' 
                           and ymd <= '%s'
-                          and dimension = 4
+                          and dimension = '设备折旧费'
                       ''' % (start_time, end_time)
 
     cursor.execute(selectPro)
@@ -99,7 +101,7 @@ with conn.cursor() as cursor:
         selectProCost = '''
             select sum(cost) totalCost from cloudteam_data_warehouse.st_equip_pro_repair_cost
             where product_id = '%s' 
-            and ymd = '%s' and equip_type = '2'
+            and ymd = '%s' and equip_type = '1'
         ''' %(productId,ymd)
 
         cursor.execute(selectProCost)
@@ -109,7 +111,7 @@ with conn.cursor() as cursor:
         insertCost = '''
                         update cloudteam_data_warehouse.dw_production_cost 
                         set cost = %s  
-                        where product_id = %s and dimension = 4
+                        where product_id = %s and dimension = '设备折旧费'
                         and ymd = %s
                     '''
         cursor.execute(insertCost, [totalCost/row['sum'], productId, ymd])
