@@ -4,6 +4,7 @@ import json
 from datetime import datetime
 import decimal
 import configparser
+import time
 
 conn = pymysql.connect(host='10.20.5.3', user='root', password='Isysc0re', port=63306,
                        db='cloudteam', cursorclass=pymysql.cursors.DictCursor)  # 使用字典游标查询)
@@ -18,12 +19,32 @@ options_end = cf['end_time']
 start_time = options_start['start_time']
 end_time = options_end['end_time']
 
-# start_time = '2020-09-01'
-# end_time = '2020-10-01'
+# start_time = '2020-07-01'
+# end_time = '2020-08-01'
+
+def getAttendPerson():
+    selectDialyInfo = '''
+               select record.record_data
+                               from isyscore_form_record record
+                               left join isyscore_form_info info
+                               on record.form_id = info.id
+                               where record.del_flag = '0' and info.del_flag = '0'
+                               and info.form_name = '员工考勤表' 
+                         limit 0,1
+         '''
+    cursor.execute(selectDialyInfo)
+    resultOne = cursor.fetchone()
+    result = resultOne['record_data']
+    jsonData = json.loads(result)
+    recordDataArray = list(map(lambda x: x['fieldId'], jsonData))
+    timeFieldId = str(recordDataArray[1])
+    return timeFieldId
+
+def getYmd(ymd):
+    return int(time.mktime(time.strptime(str(ymd), '%Y-%m-%d'))) * 1000
 
 with conn.cursor() as cursor:
 
-    #if (options_start['start_time'] == None and options_end['end_time'] == None):
     if (start_time == None and start_time == None):
         insertSql = '''
                 insert into cloudteam_data_warehouse.dw_production_cost 
@@ -51,7 +72,10 @@ with conn.cursor() as cursor:
                          where ymd >= %s and ymd <= %s 
                          and dimension = '生产人员工资'
                      '''
-        # cursor.execute(deleteSql, [options_start['start_time'], options_end['end_time']])
+
+        start = int(time.mktime(time.strptime(start_time, "%Y-%m-%d"))) * 1000
+        end = int(time.mktime(time.strptime(end_time, "%Y-%m-%d"))) * 1000
+
         cursor.execute(deleteSql, [start_time, end_time])
         insertSql = '''
                        insert into cloudteam_data_warehouse.dw_production_cost 
@@ -77,10 +101,9 @@ with conn.cursor() as cursor:
     cursor.execute(insertSql)
     # dimension = 1 : 生产人工费
 
-    # if (options_start['start_time'] == None and options_end['end_time'] == None):
     if (start_time == None and start_time == None):
         selectPro = '''
-                select product_id,sum from cloudteam_data_warehouse.dw_production_cost 
+                select product_id,sum,ymd from cloudteam_data_warehouse.dw_production_cost 
                 where ymd = date_format(now(),'%Y-%m-%d') and dimension = '生产人员工资'
             '''
     else:
@@ -92,24 +115,24 @@ with conn.cursor() as cursor:
                    '''  %(start_time,end_time)
 
     cursor.execute(selectPro)
+    ymdNum = 0
     for row in cursor.fetchall():
         productId = row['product_id']
-        now = datetime.now()
-        ymd = now.strftime("%Y-%m-%d")
-
-        if (start_time != None and end_time != None):
-            ymd = row['ymd']
-
+        ymdd = row['ymd']
         # 查询考勤表请假的人员
+
+        ymdNum = getYmd(ymdd)
+        timeFieldId = getAttendPerson()
         selectRecord = '''
-            	select record.record_data
-                from isyscore_form_record record
-                left join isyscore_form_info info
-                on record.form_id = info.id
-                where record.del_flag = '0' and info.del_flag = '0'
-                and info.form_name = '员工考勤表' 
-                and date_format(record.create_time,'%s-%s-%s') = '%s'          
-        '''  %('Y','m','d',ymd)
+            select record_data from isyscore_form_record record
+            where id in 
+            (
+            select search_id from isyscore_form_seach_index search
+            where field_id = '%s' and field_data = %s
+            and search.del_flag = '0'
+            )
+            and record.del_flag = '0'  
+        '''  %(timeFieldId,ymdNum)
         cursor.execute(selectRecord)  #'%Y-%m-%d'
         # 请假人的id列表
         array = []
@@ -135,7 +158,7 @@ with conn.cursor() as cursor:
         '''
 
         perArray = []
-        cursor.execute(selectPersons,['0',productId,ymd])
+        cursor.execute(selectPersons,['0',productId,ymdd])
         for row2 in cursor.fetchall():
             if(row2['id'] in array):
                 continue
@@ -173,7 +196,7 @@ with conn.cursor() as cursor:
                                 '''
                 cursor.execute(selectPros,[perId,proId])
                 timeObj = cursor.fetchone()
-                time = timeObj['time']  #标准工时
+                standTime = timeObj['time']  #标准工时
 
                 selectSum = '''
                     select sum
@@ -181,11 +204,11 @@ with conn.cursor() as cursor:
                     where ymd = %s and dimension = '生产人员工资'
                     and product_id = %s
                 '''
-                cursor.execute(selectSum,[ymd,proId])
+                cursor.execute(selectSum,[ymdd,proId])
                 sumObj = cursor.fetchone()
                 if(sumObj != None):
                     sum = sumObj['sum']
-                    sumTime += (sum*time)
+                    sumTime += (sum*standTime)
 
             selectProTime = '''
                               select seqRel.product_id,seqRel.sequence_standare_time time,seqRel.part_salary
@@ -204,7 +227,7 @@ with conn.cursor() as cursor:
                                   where ymd = %s
                                   and product_id = %s  and dimension = '生产人员工资'
                           '''
-            cursor.execute(selectSum1, [ymd,productId])
+            cursor.execute(selectSum1, [ymdd,productId])
             Sum = cursor.fetchone()
             CurrentProRatio = (Time['time'] * Sum['sum'])/sumTime #岗位工资的平摊比例
             #查询当前日历工作日天数
@@ -241,7 +264,7 @@ with conn.cursor() as cursor:
             partSalary = cursor.fetchone()
             salary = partSalary['part_salary']
 
-            cursor.execute(selectSum1, [ymd,productId])
+            cursor.execute(selectSum1, [ymdd,productId])
             Sum = cursor.fetchone()
             sums = Sum['sum']
             #***********************************************
@@ -252,7 +275,7 @@ with conn.cursor() as cursor:
 
         # ******************************* 计算管理岗位的人员工资
         managePerArray = []
-        cursor.execute(selectPersons, ['1', productId, ymd])
+        cursor.execute(selectPersons, ['1', productId, ymdd])
         for row4 in cursor.fetchall():
             managePerArray.append(row4['id'])
 
@@ -275,7 +298,7 @@ with conn.cursor() as cursor:
             proId1 = managePerData[1]
             money = managePerData[2]
             if(managePerId in managePerArray):
-                 cursor.execute(selectSum, [ymd, proId1])
+                 cursor.execute(selectSum, [ymdd, proId1])
                  sumObj1 = cursor.fetchone()
                  sum2 = sumObj1['sum']
                  totalManagePersonMoney += (sum2*money)
@@ -293,7 +316,7 @@ with conn.cursor() as cursor:
                 where product_id = %s and dimension = '生产人员工资'
                 and ymd = %s
             '''
-            cursor.execute(insertCost,[perProductionSalary,productId,ymd])
+            cursor.execute(insertCost,[perProductionSalary,productId,ymdd])
         conn.commit()
 
 

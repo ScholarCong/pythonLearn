@@ -17,11 +17,8 @@ options_end = cf['end_time']
 start_time = options_start['start_time']
 end_time = options_end['end_time']
 
-# start_time = '2020-09-01'
-# end_time = '2020-10-01'
-
-start = int(time.mktime(time.strptime(start_time, "%Y-%m-%d")))*1000
-end = int(time.mktime(time.strptime(end_time, "%Y-%m-%d")))*1000
+# start_time = '2020-07-01'
+# end_time = '2020-08-01'
 
 with conn.cursor() as cursor:
 
@@ -41,7 +38,6 @@ with conn.cursor() as cursor:
     recordDataArray = list(map(lambda x: x['fieldId'], jsonData))
     timeFieldId = str(recordDataArray[0])
 
-    # if (options_start['start_time'] == None and options_end['end_time'] == None):
     if (start_time == None and start_time == None):
         selectRecord = '''
             select record_data from isyscore_form_record record
@@ -60,6 +56,9 @@ with conn.cursor() as cursor:
             where ymd >= '%s' and ymd <= '%s'
         ''' %(start_time,end_time)
         cursor.execute(deleteData)
+
+        start = int(time.mktime(time.strptime(start_time, "%Y-%m-%d"))) * 1000
+        end = int(time.mktime(time.strptime(end_time, "%Y-%m-%d"))) * 1000
 
         selectRecord = '''
                    select record_data from isyscore_form_record record

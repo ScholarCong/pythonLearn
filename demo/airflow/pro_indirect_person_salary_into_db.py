@@ -4,6 +4,7 @@ import json
 from datetime import datetime
 import decimal
 import configparser
+import time
 
 conn = pymysql.connect(host='10.20.5.3', user='root', password='Isysc0re', port=63306,
                        db='cloudteam', cursorclass=pymysql.cursors.DictCursor)  # 使用字典游标查询)
@@ -17,12 +18,29 @@ options_end = cf['end_time']
 start_time = options_start['start_time']
 end_time = options_end['end_time']
 
-# start_time = '2020-09-01'
-# end_time = '2020-10-01'
+# start_time = '2020-07-01'
+# end_time = '2020-08-01'
+
+def getAttendPerson():
+    selectDialyInfo = '''
+               select record.record_data
+                               from isyscore_form_record record
+                               left join isyscore_form_info info
+                               on record.form_id = info.id
+                               where record.del_flag = '0' and info.del_flag = '0'
+                               and info.form_name = '员工考勤表' 
+                         limit 0,1
+         '''
+    cursor.execute(selectDialyInfo)
+    resultOne = cursor.fetchone()
+    result = resultOne['record_data']
+    jsonData = json.loads(result)
+    recordDataArray = list(map(lambda x: x['fieldId'], jsonData))
+    timeFieldId = str(recordDataArray[1])
+    return timeFieldId
 
 with conn.cursor() as cursor:
 
-    #if (options_start['start_time'] == None and options_end['end_time'] == None):
     if (start_time == None and start_time == None):
         insertSql = '''
                 insert into cloudteam_data_warehouse.dw_production_cost 
@@ -50,7 +68,6 @@ with conn.cursor() as cursor:
                               where ymd >= %s and ymd <= %s 
                               and dimension = '间接人工费'
                           '''
-        # cursor.execute(deleteSql, [options_start['start_time'], options_end['end_time']])
         cursor.execute(deleteSql, [start_time, end_time])
         insertSql = '''
                        insert into cloudteam_data_warehouse.dw_production_cost 
@@ -77,7 +94,6 @@ with conn.cursor() as cursor:
     cursor.execute(insertSql)
 
     # dimension = 2 : 间接人工费
-    # if (options_start['start_time'] == None and options_end['end_time'] == None):
     if (start_time == None and start_time == None):
         selectPro = '''
                    select product_id,sum,ymd from cloudteam_data_warehouse.dw_production_cost 
@@ -98,15 +114,17 @@ with conn.cursor() as cursor:
 
         ymd = row['ymd']
         # 查询考勤表请假的人员
+        ymdNum = int(time.mktime(time.strptime(ymd, "%Y-%m-%d"))) * 1000
         selectRecord = '''
-                        select record.record_data
-                        from isyscore_form_record record
-                        left join isyscore_form_info info
-                        on record.form_id = info.id
-                        where record.del_flag = '0' and info.del_flag = '0'
-                        and info.form_name = '员工考勤表' 
-                        and date_format(record.create_time,'%s-%s-%s') =  '%s'                
-                ''' %('Y','m','d',ymd)
+                   select record_data from isyscore_form_record record
+                   where id in 
+                   (
+                   select search_id from isyscore_form_seach_index search
+                   where field_id = '%s' and field_data = %s
+                   and search.del_flag = '0'
+                   )
+                   and record.del_flag = '0'  
+               ''' % (getAttendPerson(), ymdNum)
         cursor.execute(selectRecord)
         # 请假人的id列表
         array = []

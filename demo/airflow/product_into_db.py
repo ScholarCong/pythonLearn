@@ -7,6 +7,7 @@ cursor = conn.cursor()
 
 with conn.cursor() as cursor:
 
+    # 正在产线上生产的产品
     cursor.execute("delete from st_product_info")
     sql = '''
                 insert into st_product_info (product_id,product_name,line_id,standard_time) 

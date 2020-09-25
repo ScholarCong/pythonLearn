@@ -16,8 +16,8 @@ options_end = cf['end_time']
 start_time = options_start['start_time']
 end_time = options_end['end_time']
 
-# start_time = '2020-09-01'
-# end_time = '2020-10-01'
+# start_time = '2020-07-15'
+# end_time = '2020-08-01'
 
 def getRatio(ymd,productId):
     # 计算分摊规则2
@@ -64,7 +64,6 @@ def getRatio(ymd,productId):
 
 with conn.cursor() as cursor:
 
-    # if (options_start['start_time'] == None and options_end['end_time'] == None):
     if (start_time == None and start_time == None):
         insertSql = '''
                 insert into cloudteam_data_warehouse.dw_production_cost 
@@ -118,7 +117,6 @@ with conn.cursor() as cursor:
     cursor.execute(insertSql)
 
     #计算产品的能源费
-    # if (options_start['start_time'] == None and options_end['end_time'] == None):
     if (start_time == None and start_time == None):
         selectPro = '''
                    select product_id,sum from cloudteam_data_warehouse.dw_production_cost 

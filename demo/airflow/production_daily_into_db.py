@@ -17,43 +17,63 @@ options_end = cf['end_time']
 start_time = options_start['start_time']
 end_time = options_end['end_time']
 
-# start_time = '2020-09-01'
-# end_time = '2020-10-01'
+# start_time = '2020-07-01'
+# end_time = '2020-08-01'
 
 with conn.cursor() as cursor:
 
-    #if (options_start['start_time'] == None and options_end['end_time'] == None):
+    selectDialyInfo = '''
+             select record.record_data
+                             from isyscore_form_record record
+                             left join isyscore_form_info info
+                             on record.form_id = info.id
+                             where record.del_flag = '0' and info.del_flag = '0'
+                             and info.form_name = '生产日报' 
+                       limit 0,1
+       '''
+    cursor.execute(selectDialyInfo)
+    resultOne = cursor.fetchone()
+    result = resultOne['record_data']
+    jsonData = json.loads(result)
+    recordDataArray = list(map(lambda x: x['fieldId'], jsonData))
+    timeFieldId = str(recordDataArray[1])
+
     if (start_time == None and end_time == None):
         record_sql = '''
-            select record.wt_id,wt.wt_name,record.record_data
-            from isyscore_form_record record
-            left join isyscore_form_info info
-            on record.form_id = info.id
-            left join isyscore_work_team_info wt 
-            on wt.id = record.wt_id
-            where record.del_flag = '0' and info.del_flag = '0' and wt.del_flag = '0'
-            and info.form_name = '生产日报' 
-            and date_format(record.create_time,'%Y-%m-%d') = date_format(now(),'%Y-%m-%d');  #'%Y-%m-%d %H:%i:%s'
-        '''
+            select record_data,wt_id,info.wt_name from isyscore_form_record record
+            left join isyscore_work_team_info info 
+            on record.wt_id = info.id 
+            where record.id in 
+            (
+            select search_id from isyscore_form_seach_index search
+            where field_id = '%s' and field_data = %s
+            and search.del_flag = '0'
+            )
+            and record.del_flag = '0'
+        ''' %(timeFieldId,time.time())
     else:
         deleteRecord = '''
               delete from cloudteam_data_warehouse.st_production_daily_record
-                         where ymd >= %s and ymd <= %s
-        ''' %(start_time,end_time)
+                         where ymd >= '%s' and ymd <= '%s'
+        ''' %(str(start_time),str(end_time))
         cursor.execute(deleteRecord)
 
+        start = int(time.mktime(time.strptime(start_time, "%Y-%m-%d"))) * 1000
+        end = int(time.mktime(time.strptime(end_time, "%Y-%m-%d"))) * 1000
+
         record_sql = '''
-                   select record.wt_id,wt.wt_name,record.record_data
-                   from isyscore_form_record record
-                   left join isyscore_form_info info
-                   on record.form_id = info.id
-                   left join isyscore_work_team_info wt 
-                   on wt.id = record.wt_id
-                   where record.del_flag = '0' and info.del_flag = '0' and wt.del_flag = '0'
-                   and info.form_name = '生产日报' 
-                   and record.create_time >= '%s'
-                   and record.create_time <= '%s'; 
-               ''' %(start_time,end_time)
+                  select record_data,wt_id,info.wt_name from isyscore_form_record record
+                  left join isyscore_work_team_info info 
+                  on record.wt_id = info.id 
+                   where record.id in 
+                   (
+                       select search_id from isyscore_form_seach_index search
+                       where field_id = '%s' and field_data >= %s
+                       and field_data <= %s
+                       and search.del_flag = '0'
+                   )
+                   and record.del_flag = '0'
+               '''  %(timeFieldId,start,end)
 
     cursor.execute(record_sql)
 

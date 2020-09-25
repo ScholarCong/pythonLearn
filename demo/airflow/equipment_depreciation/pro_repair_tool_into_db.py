@@ -17,12 +17,11 @@ options_end = cf['end_time']
 start_time = options_start['start_time']
 end_time = options_end['end_time']
 
-# start_time = '2020-09-01'
-# end_time = '2020-10-01'
+# start_time = '2020-07-01'
+# end_time = '2020-08-01'
 
 with conn.cursor() as cursor:
 
-    # if (options_start['start_time'] == None and options_end['end_time'] == None):
     if (start_time == None and start_time == None):
         insertSql = '''
                 insert into cloudteam_data_warehouse.dw_production_cost 
