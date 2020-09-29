@@ -67,7 +67,7 @@ def getAttendDays(ymdd):
 
 
 with conn.cursor() as cursor:
-    if (start_time == None and start_time == None):
+    if (start_time == None and end_time == None):
         insertSql = '''
                 insert into cloudteam_data_warehouse.dw_production_cost 
                 (ymd,product_name,product_id,dimension,sum)

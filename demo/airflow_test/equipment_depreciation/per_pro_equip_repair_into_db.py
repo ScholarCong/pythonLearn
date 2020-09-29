@@ -19,7 +19,7 @@ end_time = '2020-08-01'
 
 def getPros():
 
-    if (start_time == None and start_time == None):
+    if (start_time == None and end_time == None):
         selectPros = '''
                select product_id from cloudteam_data_warehouse.st_production_daily_record record
                where record.ymd = date_format(now(),'%Y-%m-%d') 
@@ -82,7 +82,7 @@ with conn.cursor() as cursor:
                 group by sequenceRel.product_id
             ''' %(equipmentId)
             cursor.execute(selectEquipPros)
-            equipSelectProIdArray = []
+            equipSelectProIdArray = []  #该设备今天生产的所有的产品的id
             for row1 in cursor.fetchall():
                 prodId = row1['product_id']
                 if(prodId in getPros()):
@@ -119,34 +119,34 @@ with conn.cursor() as cursor:
                 if(productId == proId):
                     currentCost = caculateTime
 
-                ratio = currentCost/totalCost  #分摊比例
-                selectEquipCost = '''
-                    select cost from cloudteam_data_warehouse.st_equip_repair_info
-                    where ymd = '%s' and equip_id = '%s'
-                ''' %(ymd[0:7],equipmentId)
-                cursor.execute(selectEquipCost)
-                costObj = cursor.fetchone()
-                if(costObj != None):
-                    cost = costObj['cost']  #设备的维修平均一天的总费用
-                    proEquipCost = cost*float(ratio)  #当前设备在这天分摊到该产品总的维修费
+            ratio = currentCost/totalCost  #分摊比例
+            selectEquipCost = '''
+                select cost from cloudteam_data_warehouse.st_equip_repair_info
+                where ymd = '%s' and equip_id = '%s'
+            ''' %(ymd[0:7],equipmentId)
+            cursor.execute(selectEquipCost)
+            costObj = cursor.fetchone()
+            if(costObj != None):
+                cost = costObj['cost']  #设备的维修平均一天的总费用
+                proEquipCost = cost*float(ratio)  #当前设备在这天分摊到该产品总的维修费
 
-                    selectEquipType = '''
-                        select type from cloudteam_data_warehouse.st_equip_repair_info
-                        where equip_id = '%s'
-                        group by equip_id
-                    '''  %(equipmentId)
-                    cursor.execute(selectEquipType)
-                    type = cursor.fetchone()
-                    typeCode = type['type']
+                selectEquipType = '''
+                    select type from cloudteam_data_warehouse.st_equip_repair_info
+                    where equip_id = '%s'
+                    group by equip_id
+                '''  %(equipmentId)
+                cursor.execute(selectEquipType)
+                type = cursor.fetchone()
+                typeCode = type['type']
 
-                    insertSql = '''
-                        insert into cloudteam_data_warehouse.st_equip_pro_repair_cost values
-                        (%s,%s,%s,%s,%s)
-                    '''
+                insertSql = '''
+                    insert into cloudteam_data_warehouse.st_equip_pro_repair_cost values
+                    (%s,%s,%s,%s,%s)
+                '''
 
-                cursor.execute(insertSql,[ymd,equipmentId,productId,proEquipCost,typeCode])
+            cursor.execute(insertSql,[ymd,equipmentId,productId,proEquipCost,typeCode])
 
-                conn.commit()
+            conn.commit()
 
 
 

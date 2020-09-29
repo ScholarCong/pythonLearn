@@ -74,7 +74,7 @@ with conn.cursor() as cursor:
     cursor.execute(insertSql)
 
     #计算产品的设备折旧费
-    if (start_time == None and start_time == None):
+    if (start_time == None and end_time == None):
         selectPro = '''
                    select product_id,sum,ymd from cloudteam_data_warehouse.dw_production_cost 
                    where ymd = date_format(now(),'%Y-%m-%d') and dimension = '设备折旧费'

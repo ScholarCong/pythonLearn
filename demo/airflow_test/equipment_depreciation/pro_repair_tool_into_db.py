@@ -22,7 +22,7 @@ end_time = '2020-08-01'
 
 with conn.cursor() as cursor:
 
-    if (start_time == None and start_time == None):
+    if (start_time == None and end_time == None):
         insertSql = '''
                 insert into cloudteam_data_warehouse.dw_production_cost 
                 (ymd,product_name,product_id,dimension,sum)
@@ -49,7 +49,6 @@ with conn.cursor() as cursor:
                          where ymd >= %s and ymd <= %s 
                          and dimension = '工装折旧费'
                      '''
-        # cursor.execute(deleteSql, [options_start['start_time'], options_end['end_time']])
         cursor.execute(deleteSql, [start_time, end_time])
         insertSql = '''
                        insert into cloudteam_data_warehouse.dw_production_cost 

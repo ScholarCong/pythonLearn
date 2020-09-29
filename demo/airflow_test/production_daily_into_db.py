@@ -50,7 +50,7 @@ with conn.cursor() as cursor:
             and search.del_flag = '0'
             )
             and record.del_flag = '0'
-        ''' %(timeFieldId,time.time())
+        ''' %(timeFieldId,int(time.time()*1000))
     else:
         deleteRecord = '''
               delete from cloudteam_data_warehouse.st_production_daily_record
